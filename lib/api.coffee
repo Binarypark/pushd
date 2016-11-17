@@ -19,10 +19,10 @@ exports.setupRestApi = (app, createSubscriber, getEventFromId, authorize, testSu
                 subscriber.get (info) ->
                     info.id = subscriber.id
                     res.header 'Location', "/subscriber/#{subscriber.id}"
-                    res.json info, if created then 201 else 200
+                    res.status((if created then 201 else 200)).json info
         catch error
             logger.error "Creating subscriber failed: #{error.message}"
-            res.json error: error.message, 400
+            res.status(400).json error: error.message
 
     # Get subscriber info
     app.get '/subscriber/:subscriber_id', authorize('register'), (req, res) ->
@@ -31,7 +31,7 @@ exports.setupRestApi = (app, createSubscriber, getEventFromId, authorize, testSu
                 logger.error "No subscriber #{req.subscriber.id}"
             else
                 logger.verbose "Subscriber #{req.subscriber.id} info: " + JSON.stringify(fields)
-            res.json fields, if fields? then 200 else 404
+            res.status((if fields? then 200 else 404)).json fields
 
     # Edit subscriber info
     app.post '/subscriber/:subscriber_id', authorize('register'), (req, res) ->
@@ -79,7 +79,7 @@ exports.setupRestApi = (app, createSubscriber, getEventFromId, authorize, testSu
                 subsToAdd[event.name] = event: event, options: options
             catch error
                 logger.error "Failed to set subscriptions for #{req.subscriber.id}: #{error.message}"
-                res.json error: error.message, 400
+                res.status(400).json error: error.message
                 return
 
         req.subscriber.getSubscriptions (subs) ->
@@ -141,13 +141,12 @@ exports.setupRestApi = (app, createSubscriber, getEventFromId, authorize, testSu
 
     # Unsubscribe a subscriber from an event
     app.delete '/subscriber/:subscriber_id/subscriptions/:event_id', authorize('register'), (req, res) ->
-        req.subscriber.removeSubscription req.event, (errorDeleting) ->
-            if errorDeleting?
-                logger.error "No subscriber #{req.subscriber.id} or not subscribed to #{req.event.name}"
-
-            # TODO: add the check for empty events and the requisite event.delete() call here.
-
-            res.send if errorDeleting then 404 else 204
+        req.subscriber.removeSubscription req.event, (deleted) ->
+            if not deleted?
+                logger.error "No subscriber #{req.subscriber.id}"
+            else if not deleted
+                logger.error "Subscriber #{req.subscriber.id} was not subscribed to #{req.event.name}"
+            res.send if deleted then 204 else 404
 
     # Event stats
     app.get '/event/:event_id', authorize('register'), (req, res) ->
@@ -156,7 +155,7 @@ exports.setupRestApi = (app, createSubscriber, getEventFromId, authorize, testSu
                 logger.error "No event #{req.event.name}"
             else
                 logger.verbose "Event #{req.event.name} info: " + JSON.stringify info
-            res.json info, if info? then 200 else 404
+            res.status((if info? then 200 else 404)).json info
 
     # Publish an event
     app.post '/event/:event_id', authorize('publish'), (req, res) ->

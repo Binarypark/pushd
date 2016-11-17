@@ -16,8 +16,6 @@ if settings.server.redis_socket?
     redis = require('redis').createClient(settings.server.redis_socket)
 else if settings.server.redis_port? or settings.server.redis_host?
     redis = require('redis').createClient(settings.server.redis_port, settings.server.redis_host)
-else
-    redis = require('redis').createClient()
 if settings.server.redis_db_number?
     redis.select(settings.server.redis_db_number)
 
@@ -86,7 +84,7 @@ app.param 'subscriber_id', (req, res, next, id) ->
         delete req.params.subscriber_id
         next()
     catch error
-        res.json error: error.message, 400
+        res.status(400).json error: error.message
 
 getEventFromId = (id) ->
     return new Event(redis, id)
@@ -103,7 +101,7 @@ app.param 'event_id', (req, res, next, id) ->
         delete req.params.event_id
         next()
     catch error
-        res.json error: error.message, 400
+        res.status(400).json error: error.message
 
 authorize = (realm) ->
     if settings.server?.auth?
@@ -112,13 +110,13 @@ authorize = (realm) ->
             logger.verbose "Authenticating #{req.user} for #{realm}"
             if not req.user?
                 logger.error "User not authenticated"
-                res.json error: 'Unauthorized', 403
+                res.status(403).json error: 'Unauthorized'
                 return
 
             allowedRealms = settings.server.auth[req.user]?.realms or []
             if realm not in allowedRealms
                 logger.error "No access to #{realm} for #{req.user}, allowed: #{allowedRealms}"
-                res.json error: 'Unauthorized', 403
+                res.status(403).json error: 'Unauthorized'
                 return
 
             next()
@@ -132,7 +130,7 @@ authorize = (realm) ->
                     if network.contains(remoteAddr)
                         next()
                         return
-            res.json error: 'Unauthorized', 403
+            res.status(403).json error: 'Unauthorized'
     else
         return (req, res, next) -> next()
 
